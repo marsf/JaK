@@ -1,0 +1,38 @@
+{
+  "name": "JaK",
+  "description": "Japanese Kana keyboard.",
+  "version": "0.6",
+  "type": "privileged",
+  "role": "input",
+  "launch_path": "/settings.html",
+  "developer": {
+    "name": "marsf",
+    "url": "http://www.geocities.jp/chimantaea_mirabilis/gaia/jak/"
+  },
+  "permissions": {
+    "input": {
+      "description": "To send key events."
+    }
+  },
+  "inputs": {
+    "Japanese Kana": {
+      "launch_path": "/index.html",
+      "name": "Japanese Kana",
+      "description": "Japanese Kana Keyboard.",
+      "types": ["text", "url"]
+    }
+  },
+  "icons": {
+    "60": "/style/icons/jak-icon60.png",
+    "128": "/style/icons/jak-icon128.png",
+    "256": "/style/icons/jak-icon256.png"
+  },
+  "locales": {
+    "ja": {
+      "name": "JaK",
+      "description": "日本語かなキーボード"
+    }
+  },
+  "default_locale": "en-US",
+  "installs_allowed_from": [ "*" ]
+}

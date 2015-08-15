@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
+  <meta charset="utf-8">
+  <title>JaK - Japanese Kana keyboard</title>
+  <script defer type="text/javascript" src="js/swiper.js"></script>
+  <script defer type="text/javascript" src="js/main.js"></script>
+  <link rel="stylesheet" type="text/css" href="style/keyboard.css" />
+</head>
+<body dir="ltr">
+  <div id="keyboard">
+    <span id="suggExpandButton" role="button">▼</span>
+    <div id="wordSuggests" collapsed="true">
+      <ul id ="suggests"></ul>
+    </div>
+    <div id="keyContainer">
+      <div class="keyRow"><span class="key key_ctrl" role="button" code="UNDO">↺</span><span class="key" role="button" code="0">あ<span class="key_sub">./@: 1</span></span><span class="key" role="button" code="1">か<span class="key_sub">abc; 2</span></span><span class="key" role="button" code="2">さ<span class="key_sub">def_ 3</span></span><span class="key key_ctrl" role="button" code="C_BS">⌫</span></div>
+      <div class="keyRow"><span class="key key_ctrl" role="button" code="C_LT">←</span><span class="key" role="button" code="3">た<span class="key_sub">ghi( 4</span></span><span class="key" role="button" code="4">な<span class="key_sub">jkl" 5</span></span><span class="key" role="button" code="5">は<span class="key_sub">mno) 6</span></span><span class="key key_ctrl" role="button" code="C_RT">→</span></div>
+      <div class="keyRow"><span class="key key_ctrl" role="button" code="MODE" id="mode_key">か</span><span class="key" role="button" code="6">ま<span class="key_sub">pqrs 7</span></span><span class="key" role="button" code="7">や<span class="key_sub">tuv' 8</span></span><span class="key" role="button" code="8">ら<span class="key_sub">wxyz 9</span></span><span class="key key_ctrl" role="button" code="XFER">⇌</span></div>
+      <div class="keyRow"><span class="key key_ctrl" role="button" code="SWKB">⌨</span><span class="key" role="button" code="STAR">小゛゜<span class="key_sub">*</span></span><span class="key" role="button" code="9">わ<span class="key_sub">-+*= 0</span></span><span class="key" role="button" code="HASH">、<span class="key_sub">,.?! #</span></span><span class="key key_ctrl" role="button" code="ENTR">↵</span></div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,132 @@
+/* Copyright (c) 2015, Masahiko Imanaka. All rights reserved. */
+@charset "UTF-8";
+
+html {
+  font-size: 10px;
+  pointer-events: none;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+}
+
+#keyboard {
+  -moz-user-select: none;
+  position: absolute;
+  bottom: 0;
+  z-index: 15;
+  width: 100%;
+  max-width: 600px;
+  background-color: rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+}
+
+
+#wordSuggests {
+  /*display: none;*/
+  pointer-events: auto;
+  position: absolute;
+  top: -3.2rem;
+  right: 0;
+  width: 100%;
+  margin: 0;
+  border-top: 0.1rem solid gray;
+  background-color: rgba(0, 0, 16, 0.8);
+  color: #fff;
+  font-family: monospace;
+  z-index: 2;
+}
+
+#wordSuggests[collapsed="true"] {
+  height: 3.1rem;
+  overflow: hidden;
+}
+#wordSuggests[collapsed="false"] {
+  height: 90%;
+  overflow: scroll;
+}
+
+
+#suggests {
+  margin: 0 2.8em 1em 0.2em;
+  padding: 0;
+}
+#suggests::first-line {
+  /*text-decoration:underline;*/
+}
+#suggests li {
+  display: inline;
+  margin-right: 0.6em;
+  padding: 0.2em;
+  font-size: 2em;
+  border-radius: 0.2em;
+  /* white-space: nowrap; */
+}
+.wordSelected {
+  background-color: #48a;
+}
+
+#suggExpandButton {
+  position: absolute;
+  top: -3rem;
+  right: 0;
+  margin: 0;
+  padding: 0 0.65em;
+  border-left: 1px solid #666;
+  border-bottom-left-radius: 0.2em;
+  background-color: #222;
+  font-size: 2rem;
+  color: #fff;
+  font-family: monospace;
+  float: right;
+  z-index: 3;
+}
+
+#keyContainer {
+  display: table;
+  table-layout: fixed;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: monospace;
+}
+
+.keyRow {
+  display: table-row;
+}
+
+.key {
+  display: table-cell;
+  position: relative;
+  margin: 0;
+  padding-bottom: 0.2em;
+  border: 0.1rem solid gray;
+  border-radius: 0.2rem;
+  background-color: #555;  /* touched: #f52. */
+  vertical-align: middle;
+  text-align: center;
+  font-size: 3.0rem;
+  color: #fff;
+  overflow: hidden;
+}
+
+.key_ctrl {
+  width: 4.8rem;
+  padding-bottom: 0;
+  color: #ccc;
+  background-color: #222;  /* touched: #f52. */
+}
+
+.key_sub {
+  pointer-events: none;
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0;
+  font-size: 1.2rem;
+  color: #bbb;
+}
+
+span[code="STAR"]{
+  font-size: 1.8rem;
+}
