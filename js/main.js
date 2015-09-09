@@ -445,14 +445,14 @@ function transVoicedKana(aChar) {
         chCode--;  // が～ぢ -> か～ち
       }
     } else if (chCode === 0x3063) {
-      chCode++;  // っ -> つ
+      chCode += 2;  // っ -> づ
+    } else if (chCode === 0x3064){
+      chCode--;  // つ -> っ
     } else if (chCode <= 0x3069) {
       if ((chCode % 2) === 0) {
-        chCode++;  // つ～と -> づ～ど
-      } else if (chCode === 0x3065) {
-        chCode -= 2;  // づ -> っ
+        chCode++;  // て～と -> で～ど
       } else {
-        chCode--;  // で～ど -> て～と
+        chCode--;  // づ～ど -> つ～と
       }
     } else if (0x306f <= chCode && chCode <= 0x307d) {
       var chGroup = (chCode - 0x306e) % 3;
