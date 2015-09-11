@@ -35,12 +35,11 @@ function jakInit() {
   cachedWindowWidth = keyboardElement.clientWidth;
   cachedWindowHeight = keyboardElement.clientHeight;
   window.navigator.mozInputMethod.oninputcontextchange = function() {
-    if (inputContext) {
+    if (inputContext !== null) {
       Composer.clearCompose();
       toggleSuggestBox('collapse');
       TransferManager.resetSuggest();
       clearSuggests();
-      inputContext = null;
     }
     getInputContext();
     resizeWindow();
@@ -63,7 +62,7 @@ function jakQuit() {
 
 
 function getInputContext() {
-  inputContext = navigator.mozInputMethod.inputcontext;
+  inputContext = window.navigator.mozInputMethod.inputcontext;
   if (inputContext) {
     formInputType = inputContext.inputType;
     formInputMode = inputContext.inputMode;
@@ -95,20 +94,53 @@ function sendKeyCode(aKeyCode, isSpecial) {
 
 // Key handlers.
 function startKeyHandle(ev) {
-  if (!inputContext) {
+  var ictx = inputContext,
+      currentKey = ev.target;
+
+  // Set backgound-color.
+  toggleKeyStyle(currentKey, true);
+
+  if (!ictx) {
     getInputContext();
   }
-  // Set backgound-color.
-  toggleKeyStyle(ev.target, true);
+  // If form text is cleard by its clear button.
+  if (ictx.textBeforeCursor.length < 1 &&
+      ictx.textAfterCursor.length < 1 &&
+      Composer.isComposing) {
+    ictx.endComposition('');
+    Composer.clearCompose();
+    console.log('JaK - form is cleared.');
+  }
 }
 
 function endKeyHandle(ev) {
-  // Recover backgound-color.
-  toggleKeyStyle(ev.target, false);
+  var currentKey = ev.target,
+      tm = TransferManager;
 
-  if (inputContext) {
-    keyHandle(ev.target, ev.direction);
-    //console.log('compose: ', Composer.relCursorPos, Composer.textStr, '/', Composer.lastStr, Composer.isComposing, '/', Composer.isTransferred);
+  // Recover backgound-color.
+  toggleKeyStyle(currentKey, false);
+
+  if (currentKey.classList.contains('key')) {
+    // Get char from class name.
+    var val = currentKey.getAttribute('code');
+    //console.log("keyHandle: currentKey.code=" + val);
+    keyHandle(val, ev.direction).then(function () {
+      //console.log('compose: ', Composer.relCursorPos, Composer.textStr, '/', tm.suggsLength, tm.targetKana, Composer.isComposing, '/', Composer.isTransferred);
+      finalizeKeyHandle();
+      if (Composer.isComposing) {
+        if(tm.suggsLength > 0) {
+          updateSuggests(tm.targetKana);
+        } else {
+          clearSuggests();
+        }
+      } else {
+        tm.resetSuggest();
+        clearSuggests();
+      }
+    }).catch(function(err) {
+      console.error(err);
+      clearSuggests();
+    });
   }
 }
 
@@ -125,301 +157,337 @@ function toggleKeyStyle(aKey, aIsTouched) {
 }
 
 
-// Main Key Handler.
-function keyHandle(aCurrentKey, aFlickDirection) {
+// Main Key Process.
+function keyHandle(aKeyValue, aFlickDirection) {
   var ictx = inputContext,
-      val = '',
+      cp = Composer,
+      tm = TransferManager,
+      transPromise = null,
       ch = '',
-      textBC = '',
-      t_str = '', nextStr = '',
-      lastKana = '';
-
-  // If form text is cleard by its clear button.
-  if (ictx.textBeforeCursor.length < 1 &&
-      ictx.textAfterCursor.length < 1 &&
-      Composer.isComposing) {
-    ictx.endComposition('');
-    Composer.clearCompose();
-    console.log('JaK - form is cleared.');
-  }
-
-  // Get char from class name.
-  if (aCurrentKey.classList.contains('key')) {
-    val = aCurrentKey.getAttribute('code');
-    //console.log("keyHandle: aCurrentKey.code="+val);
-    if (Composer.isComposing) {
-      switch (val) {
-        case 'UNDO':
-          if (Composer.isTransferred === true) {
-            lastKana = TransferManager.getLastKana();
-            Composer.isTransferred = false;
-            TransferManager.resetSuggest();
-            Composer.setCurrentStr(Composer.lastStr);
-            Composer.relCursorPos = (lastKana.length > 0) ? lastKana.length : Composer.lastStr.length;
-          } else {
-            if (Composer.lastStr === Composer.textStr) {
-              Composer.setLastStr('');
-              Composer.isComposing = false;
-            }
+      textBC = '',  // inputContext.textBeforeCursor.
+      moveStep = 0;
+  if (cp.isComposing) {
+    switch (aKeyValue) {
+      case 'UNDO':
+        if (cp.isTransferred === true) {
+          cp.isTransferred = false;
+          tm.resetSuggest();
+          cp.setCurrentStr(tm.lastKana);
+          cp.relCursorPos = tm.targetKana.length;
+        } else {
+          if (cp.textStr === tm.lastKana) {
+            cp.setCurrentStr('');
+            tm.lastKana = '';
           }
-          break;
-        case 'C_BS':
-          // Backspace
-          if (Composer.isTransferred === true) {
-            Composer.isTransferred = false;
-            TransferManager.resetSuggest();
-            Composer.setCurrentStr(Composer.lastStr);
-          } else {
-            Composer.backSpace();
-          }
-          break;
-        case 'C_LT':
-          // Move cursor to left.
-          Composer.moveCursorPos(-1);
-          if (Composer.isTransferred === true) {
-            lastKana = TransferManager.getLastKana();
-            Composer.relCursorPos = lastKana.length - 1;
-            transWord(Composer.lastStr.slice(0, Composer.relCursorPos));
-            t_str = TransferManager.getNextWord();
-            nextStr = Composer.lastStr.slice(Composer.relCursorPos);
-            Composer.setCurrentStr(t_str + nextStr);
-            if (Composer.relCursorPos > 0) {
-              TransferManager.setClauses(Composer.textStr.length, Composer.relCursorPos);
+        }
+        break;
+      case 'C_BS':
+        // Backspace
+        if (cp.isTransferred === true) {
+          // Cancel transfer.
+          cp.isTransferred = false;
+          tm.resetSuggest();
+          cp.setCurrentStr(tm.lastKana);
+          cp.relCursorPos = tm.targetKana.length;
+        } else {
+          cp.backSpace();
+          if (cp.textStr.length > 0) {
+            tm.lastKana = cp.textStr;
+            tm.targetKana = cp.textStr.slice(0, cp.relCursorPos);
+            if (cp.relCursorPos > 0) {
+              transPromise = getTransWords(tm.targetKana, false);
             } else {
-              Composer.isTransferred = false;
+              tm.resetSuggest();
             }
-          }
-          break;
-        case 'C_RT':
-          // Move cursor to right.
-          Composer.moveCursorPos(1);
-          if (Composer.isTransferred === true) {
-            lastKana = TransferManager.getLastKana();
-            Composer.relCursorPos = lastKana.length + 1;
-            transWord(Composer.lastStr.slice(0, Composer.relCursorPos));
-            t_str = TransferManager.getNextWord();
-            nextStr = Composer.lastStr.slice(Composer.relCursorPos);
-            Composer.setCurrentStr(t_str + nextStr);
-            TransferManager.setClauses(Composer.textStr.length, Composer.relCursorPos);
-          }
-          break;
-        case 'XFER':
-          if (Composer.isTransferred === false) {
-            Composer.isTransferred = true;
-            Composer.setLastStr(Composer.textStr);
-            transWord(Composer.textStr.slice(0, Composer.relCursorPos));
-          }
-          t_str = TransferManager.getNextWord();
-          nextStr = Composer.lastStr.slice(Composer.relCursorPos);
-          Composer.setCurrentStr(t_str + nextStr);
-          TransferManager.setClauses(Composer.textStr.length, t_str.length);
-          break;
-        case 'ENTR':
-          if (TransferManager.clausesCount > 1) {
-            var selectedText = Composer.textStr.slice(0, TransferManager.clauses[0].length),
-                remainText = Composer.textStr.slice(selectedText.length);
-            ictx.endComposition(selectedText);
-            //TransferManager.resetSuggest(remainText);
-            clearSuggests();
-            Composer.setLastStr(remainText);
-            Composer.setCurrentStr(remainText);  // next clause.
-            Composer.moveCursorPos(remainText.length);  // last pos: remainText.length
-            TransferManager.setClauses(Composer.textStr.length, Composer.relCursorPos);
-            transWord(remainText);
           } else {
-            TransferManager.setLastKana(Composer.lastStr);
-            Composer.setLastStr(Composer.textStr);
-            Composer.isComposing = false;
+            // Processed in finalizeKeyHandle().
           }
-          break;
-        case 'MODE':
-          Composer.toggleMode();
-          break;
-        case 'SWKB':
-          ictx.endComposition(Composer.textStr);
-          Composer.clearCompose();
-          TransferManager.resetSuggest();
+        }
+        break;
+      case 'C_LT':
+        // Move cursor to left.
+        if (cp.isTransferred === false) {
+          cp.moveCursorPos(cp.relCursorPos - 1);
+        } else {
+          cp.setCurrentStr(tm.lastKana);
+          moveStep = cp.moveCursorPos(tm.targetKana.length - 1);
+          tm.targetKana = cp.textStr.slice(0, cp.relCursorPos);
+          if (cp.relCursorPos > 0) {
+            transPromise = getTransWords(tm.targetKana);
+          } else {
+            cp.isTransferred = false;
+            tm.targetKana = '';
+            tm.resetSuggest();
+          }
+        }
+        break;
+      case 'C_RT':
+        // Move cursor to right.
+        if (cp.isTransferred === false) {
+          cp.moveCursorPos(cp.relCursorPos + 1);
+        } else {
+          cp.setCurrentStr(tm.lastKana);
+          moveStep = cp.moveCursorPos(tm.targetKana.length + 1);
+          if (moveStep !== 0) {
+            tm.targetKana = cp.textStr.slice(0, cp.relCursorPos);
+            transPromise = getTransWords(tm.targetKana);
+          }
+        }
+        break;
+      case 'XFER':
+        if (cp.isTransferred === false) {
+          if (cp.relCursorPos < 1) {
+            cp.moveCursorPos(cp.textStr.length);
+          }
+          tm.targetKana = cp.textStr.slice(0, cp.relCursorPos);
+          cp.isTransferred = true;
+          transPromise = getTransWords(tm.targetKana);
+        } else {
+          var t_str = tm.getNextWord(),
+              nextStr = tm.lastKana.slice(cp.relCursorPos);
+          cp.setCurrentStr(t_str + nextStr);
+          tm.setClauses(cp.textStr.length, t_str.length);
+        }
+        break;
+      case 'ENTR':
+        if (tm.clausesCount > 1) {
+          var selectedText = cp.textStr.slice(0, tm.clauses[0].length),
+              remainText = cp.textStr.slice(selectedText.length);
+          ictx.replaceSurroundingText(selectedText, 0, 0);
           clearSuggests();
-          if (aFlickDirection === 'up') {
-            mgmt.showAll();
-          } else {
-            mgmt.next();
-          }
-          break;
-        case 'STAR':
-          // '*' key
-          if (aFlickDirection === 'tap') {
-            var str = Composer.textStr,
-                pos = Composer.relCursorPos;
+          cp.setCurrentStr(remainText);  // next clause.
+          cp.moveCursorPos(remainText.length);  // last pos: remainText.length
+          tm.setClauses(cp.textStr.length, cp.relCursorPos);
+          tm.lastKana = remainText;
+          tm.targetKana = remainText;
+          transPromise = getTransWords(tm.targetKana);
+        } else {
+          cp.isComposing = false;
+        }
+        break;
+      case 'MODE':
+        ictx.endComposition(cp.textStr);
+        cp.lastWord = cp.textStr;
+        cp.clearCompose();
+        tm.resetSuggest();
+        clearSuggests();
+        cp.setMode();
+        break;
+      case 'SWKB':
+        ictx.endComposition(cp.textStr);
+        cp.lastWord = cp.textStr;
+        cp.clearCompose();
+        tm.resetSuggest();
+        clearSuggests();
+        if (aFlickDirection === 'up') {
+          mgmt.showAll();
+        } else {
+          mgmt.next();
+        }
+        break;
+      /*
+      case 'HASH':
+        // '#' key
+        ch = getFlickedChar(aKeyValue, aFlickDirection);
+        var text = (ch !== '') ? cp.textStr + ch : cp.textStr;
+        ictx.endComposition(text);
+        cp.clearCompose();
+        break;
+      */
+      case 'STAR':
+        // '*' key
+        if (aFlickDirection === 'tap') {
+          var str = cp.textStr,
+              pos = cp.relCursorPos;
+          if (cp.isTransferred === false) {
             if (pos > 0) {
               ch = transVoicedKana(str.slice(pos - 1, pos));  // Get a char before cursor.
-              Composer.replaceChar(ch, pos);
+              cp.replaceChar(ch, pos);
+              //console.log('STAR', cp.textStr);
+              tm.lastKana = cp.textStr;
+              tm.targetKana = cp.textStr.slice(0, cp.relCursorPos);
+              transPromise = getTransWords(tm.targetKana);
             }
-          } else {
-            ch = getFlickedChar('STAR', aFlickDirection);
-            Composer.insertChar(ch);
           }
           break;
-        /*
-        case 'HASH':
-          // '#' key
-          ch = getFlickedChar(val, aFlickDirection);
-          var text = (ch !== '') ? Composer.textStr + ch : Composer.textStr;
-          ictx.endComposition(text);
-          Composer.clearCompose();
-          break;
-        */
-        default:
-          if (Composer.isTransferred) {
-            ictx.endComposition(Composer.textStr);
-            Composer.setLastStr('');
-            Composer.clearCompose();
-            TransferManager.resetSuggest();
-            Composer.isComposing = true;
-          }
-          ch = getFlickedChar(val, aFlickDirection);
-          Composer.insertChar(ch);
-      }
-    } else {
-      // Composer.isComposing == false
-      switch (val) {
-        case 'UNDO':
-          if (Composer.lastStr.length > 0) {
-            textBC = ictx.textBeforeCursor;
-            var lastStr_len = Composer.lastStr.length;
-            if (textBC && textBC.length >= lastStr_len) {
-              // Replace the last string.
-              if (textBC.slice(-lastStr_len) == Composer.lastStr) {
-                ictx.deleteSurroundingText(-lastStr_len, lastStr_len);
-                // Revert the last string.
-                Composer.isComposing = true;
-                lastKana = TransferManager.getLastKana();
-                if (lastKana.length > 0) {
-                  Composer.setCurrentStr(lastKana);
-                  Composer.relCursorPos = lastKana.length;
-                } else {
-                  Composer.setCurrentStr(Composer.lastStr);
-                  Composer.relCursorPos = Composer.lastStr.length;
-                }
+        }
+        // If flicked, don't break and continue to default section.
+      default:
+        if (cp.isTransferred === true) {
+          ictx.replaceSurroundingText(cp.textStr, 0, 0);
+          tm.targetKana = '';
+          cp.clearCompose();
+          tm.resetSuggest();
+          cp.isComposing = true;
+        }
+        ch = getFlickedChar(aKeyValue, aFlickDirection);
+        cp.insertChar(ch);
+        tm.lastKana = cp.textStr;
+        tm.targetKana = cp.textStr.slice(0, cp.relCursorPos);
+        transPromise = getTransWords(tm.targetKana, false);
+    }
+  } else {
+    // Composer.isComposing == false
+    switch (aKeyValue) {
+      case 'UNDO':
+        var lastWord_len = cp.lastWord.length;
+        if (lastWord_len > 0) {
+          textBC = ictx.textBeforeCursor;
+          if (textBC && textBC.length >= lastWord_len) {
+            // Replace the last string.
+            if (textBC.slice(-lastWord_len) == cp.lastWord) {
+              ictx.deleteSurroundingText(-lastWord_len, lastWord_len);
+              // Revert the last string.
+              cp.isComposing = true;
+              var lk = tm.lastKana;
+              if (lk.length > 0) {
+                cp.setCurrentStr(lk);
+                cp.relCursorPos = lk.length;
+              } else {
+                cp.setCurrentStr(tm.targetKana);
+                cp.relCursorPos = tm.targetKana.length;
               }
             }
           }
-          break;
-        case 'C_BS':
-          // Backspace
-          if (aFlickDirection === 'down') {
-            sendKeyCode(KeyEvent.DOM_VK_DELETE, true);
+        }
+        break;
+      case 'C_BS':
+        // Backspace
+        if (aFlickDirection === 'left') {
+          sendKeyCode(KeyEvent.DOM_VK_DELETE, true);
+        } else {
+          sendKeyCode(KeyEvent.DOM_VK_BACK_SPACE, true);
+        }
+        break;
+      case 'C_LT':
+        if (aFlickDirection === 'up') {
+          // Move cursor to up.
+          sendKeyCode(KeyEvent.DOM_VK_UP, true);
+        } else {
+          // Move cursor to left.
+          sendKeyCode(KeyEvent.DOM_VK_LEFT, true);
+        }
+        break;
+      case 'C_RT':
+        if (aFlickDirection === 'down') {
+          // Move cursor to down.
+          sendKeyCode(KeyEvent.DOM_VK_DOWN, true);
+        } else {
+          // Move cursor to right.
+          sendKeyCode(KeyEvent.DOM_VK_RIGHT, true);
+        }
+        break;
+      case 'XFER':
+        switch (cp.mode) {
+          case 'KANA':
+            sendKeyCode(0x3000, false);  // full width space.
+            break;
+          case 'EISU':
+            sendKeyCode(0x0020, false);  // half width space.
+            break;
+          default:
+        }
+        break;
+      case 'ENTR':
+        sendKeyCode(KeyEvent.DOM_VK_RETURN, true);
+        break;
+      case 'MODE':
+        cp.setMode();
+        break;
+      case 'SWKB':
+        if (aFlickDirection === 'up') {
+          mgmt.showAll();
+        } else if (aFlickDirection === 'down') {
+          mgmt.hide();
+        } else {
+          mgmt.next();
+        }
+        break;
+      /*
+      case 'HASH':
+        // '#' key
+        ch = getFlickedChar(aKeyValue, aFlickDirection);
+        sendKeyCode(ch.charCodeAt(0), false);
+        break;
+      */
+      case 'STAR':
+        // '*' key
+        textBC = ictx.textBeforeCursor;
+        if (textBC) {
+          ch = transVoicedKana(textBC[textBC.length - 1]);
+          if (ch.length > 0) {
+            ictx.replaceSurroundingText(ch, -1, 1);
           } else {
-            sendKeyCode(KeyEvent.DOM_VK_BACK_SPACE, true);
+            ch = getFlickedChar(aKeyValue, aFlickDirection);
+            sendKeyCode(ch.charCodeAt(0), false);
           }
-          break;
-        case 'C_LT':
-          if (aFlickDirection === 'up') {
-            // Move cursor to up.
-            sendKeyCode(KeyEvent.DOM_VK_UP, true);
-          } else {
-            // Move cursor to left.
-            sendKeyCode(KeyEvent.DOM_VK_LEFT, true);
-          }
-          break;
-        case 'C_RT':
-          if (aFlickDirection === 'down') {
-            // Move cursor to down.
-            sendKeyCode(KeyEvent.DOM_VK_DOWN, true);
-          } else {
-            // Move cursor to right.
-            sendKeyCode(KeyEvent.DOM_VK_RIGHT, true);
-          }
-          break;
-        case 'XFER':
-          switch (Composer.getMode()) {
-            case 'KANA':
-              sendKeyCode(0x3000, false);  // full width space.
-              break;
-            case 'EISU':
-              sendKeyCode(0x0020, false);  // half width space.
-              break;
-            default:
-          }
-          break;
-        case 'ENTR':
-          sendKeyCode(KeyEvent.DOM_VK_RETURN, true);
-          break;
-        case 'MODE':
-          Composer.toggleMode();
-          break;
-        case 'SWKB':
-          if (aFlickDirection === 'up') {
-            mgmt.showAll();
-          } else if (aFlickDirection === 'down') {
-            mgmt.hide();
-          } else {
-            mgmt.next();
-          }
-          break;
-        case 'STAR':
-          // '*' key
-          textBC = ictx.textBeforeCursor;
-          if (textBC) {
-            ch = transVoicedKana(textBC[textBC.length - 1]);
-            if (ch.length > 0) {
-              ictx.replaceSurroundingText(ch, -1, 1);
-            }
-          }
-          break;
-        /*
-        case 'HASH':
-          // '#' key
-          ch = getFlickedChar(val, aFlickDirection);
-          ictx.setComposition(ch);
-          ictx.endComposition(ch);
-          break;
-        */
-        default:
-          Composer.isComposing = true;
-          // Set cursor position.
-          Composer.relCursorPos = 0;
-          ch = getFlickedChar(val, aFlickDirection);
-          Composer.insertChar(ch);
-      }
+        }
+        break;
+      default:
+        cp.isComposing = true;
+        // Reset cursor position.
+        cp.relCursorPos = 0;
+        ch = getFlickedChar(aKeyValue, aFlickDirection);
+        cp.insertChar(ch);
+        tm.lastKana = cp.textStr;
+        tm.targetKana = cp.textStr;
+        transPromise = getTransWords(tm.targetKana);
     }
-  } else {
-    return;
   }
 
-  if (Composer.isComposing) {
-    if (Composer.textStr.length > 0) {
-      if (Composer.isTransferred === true &&
-          TransferManager.clauses.length > 0) {
-        //console.log('clauses:', TransferManager.clauses);
-        ictx.setComposition(Composer.textStr, TransferManager.clauses[0].length, TransferManager.clauses);
+  // Process of getTransWords.then().
+  if (transPromise !== null) {
+    return transPromise.then(function (kanaStr) {
+      var cursorPos = tm.targetKana.length,
+          nextStr = cp.textStr.slice(cursorPos);
+      cp.setCurrentStr(kanaStr + nextStr);
+      if (cursorPos > 0 && kanaStr.length > 0) {
+        tm.setClauses(cp.textStr.length, cursorPos);
       } else {
-        TransferManager.clauses = [];
-        ictx.setComposition(Composer.textStr, Composer.relCursorPos);
+        cp.isTransferred = false;
       }
-      var suggs = TransferManager.getSuggests();
-      if(suggs.length > 0) {
-        updateSuggests(suggs, TransferManager.getLastKana());
+    }).catch(function (err) {
+      console.error(err);
+    });
+  } else {
+    return new Promise(function (resolve, reject) {
+      resolve();
+    });
+  }
+}
+
+function finalizeKeyHandle() {
+  var ictx = inputContext,
+      cp = Composer,
+      tm = TransferManager;
+  if (cp.isComposing) {
+    if (cp.textStr.length > 0) {
+      if (cp.isTransferred === true &&
+          tm.clauses.length > 0) {
+        //console.log('clauses:', tm.clauses);
+        ictx.setComposition(cp.textStr, tm.clauses[0].length, tm.clauses);
       } else {
-        clearSuggests();
+        tm.clauses = [];
+        ictx.setComposition(cp.textStr, cp.relCursorPos);
       }
     } else  {
-      Composer.clearCompose();
-      TransferManager.resetSuggest();
+      cp.clearCompose();
+      tm.resetSuggest();
       ictx.endComposition('');
     }
   } else {
-    if (Composer.textStr.length > 0) {
-      //console.log(' compose end: ', Composer.lastStr);
-      ictx.endComposition(Composer.lastStr);
-      if (Composer.isTransferred) {
-        TransferManager.resetSuggest();
-        clearSuggests();
+    if (cp.textStr.length > 0) {
+      //console.log(' compose end: ', cp.textStr);
+      ictx.endComposition(cp.textStr);
+      cp.lastWord = cp.textStr;
+      if (cp.isTransferred) {
+        tm.resetSuggest();
       }
-      Composer.clearCompose();
+    } else {
+      tm.resetSuggest();
     }
+    cp.clearCompose();
   }
-
   return;
 }
 
@@ -507,60 +575,13 @@ function transVoicedKana(aChar) {
 }
 
 
-/*
-//addVoicedMark(Composer.textStr, Composer.relCursorPos);
-function addVoicedMark(aStr, aPos) {
-  if (aStr.length === 0 || aPos < 1) {
-    return '';
-  }
-
-  var chCode = aStr.charCodeAt(aPos - 1);
-  if (0x304b <= chCode && chCode <= 0x3062) {
-    if ((chCode % 2) === 1) {
-      chCode++;  // か～ち -> が～ぢ
-    }
-  } else if (0x3064 <= chCode && chCode <= 0x3069) {
-    if ((chCode % 2) === 0) {
-      chCode++;  // つ～と -> づ～ど
-    }
-  } else if (0x306f <= chCode && chCode <= 0x307d) {
-    if (((chCode - 0x306e) % 3) === 1) {
-      chCode++;  // は～ほ -> ば～ぼ
-    }
-  } else if (chCode === 0x3046) {
-    chCode = 0x3094;  // う -> ゔ
-  } else if (chCode === 0x309d) {
-    chCode++;  // ゝ -> ゞ
-  } else {
-    return '';
-  }
-  return String.fromCharCode(chCode);
-}
-
-
-function addSemiVoicedMark(aStr, aPos) {
-  if (aStr.length === 0 || aPos < 1) {
-    return '';
-  }
-  var chCode = aStr.charCodeAt(aPos - 1);
-  if (0x306f <= chCode && chCode <= 0x307d) {
-    if (((chCode - 0x306e) % 3) === 1) {
-      chCode += 2;  // は～ほ -> ぱ～ぽ
-    }
-  } else {
-    return '';
-  }
-  return String.fromCharCode(chCode);
-}
-*/
-
 function transChar(aStr, aMode) {
-  // aMode: 'kana' | 'eisu'
+  // aMode: 'KANA' | 'EISU'
   //console.log('transChar:',aMode,aStr);
   var transStr = [],
       chCode, i;
   switch(aMode) {
-    case 'kana':
+    case 'KANA':
       for (i = 0; i< aStr.length; i++) {
         chCode = aStr.charCodeAt(i);
         if (0x3041 <= chCode && chCode <= 0x3096) {  // Hiragana
@@ -572,7 +593,7 @@ function transChar(aStr, aMode) {
         }
       }
       break;
-    case 'eisu':
+    case 'EISU':
       for (i = 0; i< aStr.length; i++) {
         chCode = aStr.charCodeAt(i);
         if (0xff01 <= chCode && chCode <= 0xff5e) {  // Half width
@@ -596,57 +617,65 @@ function transChar(aStr, aMode) {
 }
 
 
-function transWord(aStr) {
-  if (aStr.length < 1) {
-    console.log('JaK - transWord: empty strings.');
-    TransferManager.resetSuggest('');
-    return;
-  }
-
-  var dicData = SampleDic,
-      firstCode = aStr.charCodeAt(0),
-      results = [];
-  if (0x3040 <= firstCode && firstCode <= 0x30ff) {
-    // Hiragana -> Katakana.
-    results.push(transChar(aStr, 'kana'));
-    // Hiragana -> dic words.
-    if (aStr in dicData) {
-      results = results.concat(dicData[aStr]);
+function getTransWords(aStr) {
+  return new Promise(function(resolve, reject) {
+    var tm = TransferManager;
+    if (aStr.length < 1) {
+      console.log('JaK - getTransWords: empty strings.');
+      tm.resetSuggest('');
+      reject('empty strings.');
     }
-  } else {
-    // Eisu half <-> full width
-    results.push(transChar(aStr, 'eisu'));
-  }
-  TransferManager.resetSuggest(aStr);
-  TransferManager.addSuggest(results);
+    tm.resetSuggest(aStr);
+    var dicData = SampleDic,
+        firstCode = aStr.charCodeAt(0),
+        results = [];
+    if (0x3040 <= firstCode && firstCode <= 0x30ff) {
+      // ひらがなカタカナ変換
+      results.push(transChar(aStr, 'KANA'));
+      if (aStr in dicData) {
+        results = results.concat(dicData[aStr]);
+      }
+    } else {
+      // 英数記号 半角全角変換
+      results.push(transChar(aStr, 'EISU'));
+    }
+    tm.addSuggest(results);
+    resolve(aStr);
+  }).catch(function (err) {
+    console.log(err);
+    return aStr;
+  });
 }
 
-
 // wordSuggests box.
-function updateSuggests(aSuggs, aKana) {
-  //console.log('sugg:',aSuggs);
+function updateSuggests(aKana) {
   var suggListBox = document.getElementById('suggests'),
       suggKana = suggListBox.getAttribute('kana'),
-      prev_item = suggListBox.getElementsByClassName('wordSelected');
-  
+      prev_item = suggListBox.getElementsByClassName('wordSelected'),
+      tm = TransferManager;
+
   suggListBox.style.visibility = 'hidden';
+  //console.log('updateSuggests:', aKana, suggKana);
   if ((aKana === suggKana) && (prev_item.length > 0)) {
+    // Just move the cursor in suggest list.
     prev_item[0].className = '';
-    var curr_item = document.getElementById('W' + TransferManager.selectPos);
+    var curr_item = document.getElementById('W' + tm.selectPos);
     curr_item.className = 'wordSelected';
     // Scroll suggests box view to the selected word.
-    // .offsetTop and scrollIntoView() makes reflow.
-    if ((curr_item && curr_item.offsetLeft < 20) || TransferManager.selectPos === 0) {
+    // .offsetLeft and scrollIntoView() makes reflow.
+    if ((curr_item && curr_item.offsetLeft < 20) || tm.selectPos === 0) {
       curr_item.scrollIntoView(true);
     }
   } else {
+    // Redraw suggest list.
     suggListBox.textContent = '';
-    var suggItems = document.createDocumentFragment();
-    aSuggs.forEach(function (word, n) {
+    var suggItems = document.createDocumentFragment(),
+        suggList = tm.getSuggestList();
+    suggList.forEach(function (word, n) {
       var item = document.createElement('li');
       item.textContent = word;
       item.setAttribute('id', 'W'+n);
-      if (n === TransferManager.selectPos) {
+      if (n === tm.selectPos) {
        item.className = 'wordSelected';
       }
       suggItems.appendChild(item);
@@ -687,7 +716,7 @@ function toggleSuggestBox(mode) {
 
 function suggExpand(ev) {
   ev.preventDefault();
-  if (TransferManager.getSuggests().length > 0) {
+  if (TransferManager.suggsLength > 0) {
     toggleSuggestBox();
   } else {
     toggleSuggestBox('collapse');
@@ -698,42 +727,83 @@ function clickSuggestsBox(ev) {
   ev.preventDefault();
   if (ev.target.tagName === 'LI'){
     var ictx = inputContext,
-        word = ev.target.textContent;
-    //console.log('sugg selected:', text);
-    ictx.endComposition(word);
-    var remainText = Composer.textStr.slice(TransferManager.clauses[0].length);
-    if (TransferManager.clausesCount > 1) {
-      Composer.setLastStr(remainText);
-      Composer.clearCompose();
-      Composer.isComposing = true;
-      Composer.isTransferred = true;
-      Composer.setCurrentStr(remainText);
-      Composer.moveCursorPos(remainText.length);  // last: remainText.length
-      transWord(remainText);
-      ictx.setComposition(remainText, remainText.length);
-    } else {
-      Composer.clearCompose();
-      Composer.setLastStr(word);
-    }
-    TransferManager.resetSuggest(remainText);
+        word = ev.target.textContent,
+        cp = Composer,
+        tm = TransferManager;
+    //console.log('sugg selected:', word);
+    cp.lastWord = word;
     clearSuggests();
+    if (tm.clausesCount > 1) {
+      ictx.replaceSurroundingText(word, 0, 0);
+      var remainText = cp.textStr.slice(tm.clauses[0].length);
+      cp.setCurrentStr(remainText);
+      cp.moveCursorPos(remainText.length);  // last: remainText.length
+      tm.lastKana = cp.textStr;
+      tm.targetKana = cp.textStr.slice(0, cp.relCursorPos);
+      getTransWords(tm.targetKana, true).then(function () {
+        ictx.setComposition(remainText, remainText.length);
+        if(tm.suggsLength > 0) {
+          updateSuggests(tm.targetKana);
+        } else {
+          clearSuggests();
+        }
+      }).catch(function (err) {
+        console.error(err);
+      });
+    } else {
+      ictx.endComposition(word);
+      cp.clearCompose();
+      tm.resetSuggest();
+    }
   }
 }
 
 var Composer = {
-  _mode: 'KANA',  // 'KANA' | 'EISU'
+  _mode: 'KANA',
+  _modeList: ['KANA', 'EISU'],
   isComposing: false,
   isTransferred: false,
   relCursorPos: 0,
-  textStr: '',
-  lastStr: '',
+  textStr: '',  // Entire composed string.
+  lastWord: '',  // The last decided word.
+
+  get mode() {
+    return this._mode;
+  },
+
+  setMode: function CM_setMode(aMode) {
+    var mode_key = document.getElementById('mode_key');
+    if (aMode) {
+      if (this._modeList.indexOf(aMode) > -1) {
+        this._mode = aMode;
+      } else {
+        console.log('JaK - invalid mode:', aMode);
+      }
+    } else {
+      // Rotate the mode: KANA <-> EISU
+      var mode_idx = this._modeList.indexOf(this._mode);
+      mode_idx = (mode_idx > this._modeList.length - 2) ? 0 : mode_idx + 1;
+      this._mode =  this._modeList[mode_idx];
+    }
+    switch (this._mode) {
+      case 'KANA':
+        mode_key.textContent = 'か';
+        break;
+      case 'EISU':
+        mode_key.textContent = 'A';
+        break;
+      default:
+        console.log('JaK - invalid mode.');
+    }
+    console.log('JaK - mode:', this._mode);
+  },
 
   insertChar: function CM_insertChar(aCh) {
     if (aCh) {
       var s = this.textStr,
           pos = this.relCursorPos;
       this.textStr = s.slice(0, pos) + aCh + s.slice(pos);
-      this.moveCursorPos(1);
+      this.moveCursorPos(pos + 1);
     }
   },
 
@@ -745,7 +815,7 @@ var Composer = {
       }
     }
     if (aCh.length > 1) {
-      this.moveCursorPos(aCh.length - 1);
+      this.moveCursorPos(this.relCursorPos + aCh.length - 1);
     }
   },
 
@@ -757,32 +827,29 @@ var Composer = {
         return;
       }
       this.textStr = s.slice(0, pos - 1) + s.slice(pos);
-      this.moveCursorPos(-1);
+      this.moveCursorPos(pos - 1);
     } else {
       this.relCursorPos = 0;
     }
     return;
   },
 
-  moveCursorPos: function CM_moveCursorPos(aNum) {
-    var newPos = this.relCursorPos + aNum;
-    if (newPos > this.textStr.length) {
-      this.relCursorPos = this.textStr.length;
-    } else if (newPos < 0) {
-      this.relCursorPos = 0;
-    } else {
-      this.relCursorPos = newPos;
+  moveCursorPos: function CM_moveCursorPos(aNewPos) {
+    var oldPos = this.relCursorPos;
+    if (aNewPos > this.textStr.length) {
+      aNewPos = this.textStr.length;
+    } else if (aNewPos < 0) {
+      aNewPos = 0;
     }
-    return this.relCursorPos;
+    this.relCursorPos = aNewPos;
+    return aNewPos - oldPos;
   },
 
   setCurrentStr: function CM_setCurrentStr(aStr) {
     this.textStr = aStr;
-  },
-
-  setLastStr: function CM_setLastStr(aStr) {
-    // Set decided string. This will set to inputContext.endComposition().
-    this.lastStr = aStr;
+    if (this.relrelCursorPos > this.textStr.length) {
+      this.relrelCursorPos = this.textStr.length;
+    }
   },
 
   clearCompose: function CM_clearTextStr() {
@@ -791,44 +858,42 @@ var Composer = {
     // Clear composed data.
     this.textStr = '';
     this.relCursorPos = 0;
-  },
-
-  getMode: function CM_getMode() {
-    return this._mode;
-  },
-
-  toggleMode: function CM_toggleMode() {
-    var mode_key = document.getElementById('mode_key');
-    switch (this._mode) {
-      case 'KANA':
-        this._mode = 'EISU';
-        mode_key.textContent = 'A';
-        break;
-      case 'EISU':
-        this._mode = 'KANA';
-        mode_key.textContent = 'か';
-        break;
-      default:
-    }
-    console.log('JaK - mode:', this._mode);
   }
 };
 
 var TransferManager = {
-  _lastKana: '',
+  _targetKana: '',  // Kana string of Transfer target.
+  _lastKana: '',  // Kana string of entire composed text.
   _suggestWords: [],
-  selectPos: 0,
+  _selectPos: 0,
   clauses: [],
   clausesCount: 0,
 
+  get targetKana() {
+    return this._targetKana;
+  },
+
+  set targetKana(aStr) {
+    // Set trasfer target string temporarily.
+    this._targetKana = aStr;
+  },
+
+  set lastKana(aStr) {
+    this._lastKana = aStr;
+  },
+
+  get lastKana() {
+    return this._lastKana;
+  },
+
   setClauses: function TM_setClauses(aTextLength, aRelCursorPos) {
-    //console.log(this._suggestWords, this.selectPos);
+    //console.log(this._suggestWords, this._selectPos);
     if (this._suggestWords.length < 1) {
       this.clausesCount = 0;
       return;
     }
     this.clauses = [];
-    this.clauses.push({selectionType: 'selected-converted-text', length: this._suggestWords[this.selectPos].length});
+    this.clauses.push({selectionType: 'selected-converted-text', length: this._suggestWords[this._selectPos].length});
     if (aRelCursorPos < aTextLength) {
       this.clauses.push({selectionType: 'converted-text', length: (aTextLength - aRelCursorPos)});
     }
@@ -841,17 +906,14 @@ var TransferManager = {
 
   resetSuggest: function TM_resetSuggest(aWord) {
     this._suggestWords = [];
-    this.selectPos = 0;
+    this._selectPos = 0;
     this.clausesCount = 0;
     if (aWord) {
       this._suggestWords.push(aWord);
-      this.setLastKana(aWord);
-    } else {
-      //this.setLastKana('');
     }
   },
 
-  getSuggests: function TM_getSuggests(aCount) {
+  getSuggestList: function TM_getSuggestList(aCount) {
     if (this._suggestWords.length > 0) {
       aCount = aCount || this._suggestWords.length;
       return this._suggestWords.slice(0, aCount);
@@ -860,32 +922,36 @@ var TransferManager = {
     }
   },
 
+  get suggsLength() {
+    return this._suggestWords.length;
+  },
+
+  get selectPos() {
+    return this._selectPos;
+  },
+
+  set selectPos(pos) {
+    this._selectPos = pos;
+  },
+
   getNextWord: function TM_getNextWord() {
     if (this._suggestWords.length > 0) {
-      this.selectPos++;
-      if (this.selectPos >= this._suggestWords.length) {
-        this.selectPos = 0;
+      this._selectPos++;
+      if (this._selectPos >= this._suggestWords.length) {
+        this._selectPos = 0;
       }
-      return this._suggestWords[this.selectPos];
+      return this._suggestWords[this._selectPos];
     } else {
-      this.selectPos = 0;
+      this._selectPos = 0;
       return '';
     }
-  },
-
-  setLastKana: function TM_setLastKana(aStr) {
-    this._lastKana = aStr;
-  },
-
-  getLastKana: function TM_getLastKana() {
-    return this._lastKana;
   }
 };
 
 
 function getFlickedChar(aCode, aDir) {
+  // keycode: [center, left, up, right, down]
   var flickKeyTable = {
-    // keycode: [center, left, up, right, down]
     'KANA': {
       '0': ['あ', 'い', 'う', 'え', 'お'],
       '1': ['か', 'き', 'く', 'け', 'こ'],
@@ -911,14 +977,13 @@ function getFlickedChar(aCode, aDir) {
       '7': ['8', 't', 'u', 'v', '\''],
       '8': ['9', 'w', 'x', 'y', 'z'],
       '9': ['0', '-', '+', '*', '='],
-      'STAR': ['', '\t', '', ' ', ''],
+      'STAR': ['*', '\t', '', ' ', ''],
       'HASH': ['#', ',', '.', '?', '!']
     }
-  };
-
-  var f_key = flickKeyTable[Composer.getMode()][aCode],
-      ch;
-
+  },
+      mode = Composer.mode,
+      ch = '';
+  var f_key = flickKeyTable[mode][aCode];
   switch (aDir) {
     case 'tap':
       ch = f_key[0];
@@ -978,6 +1043,7 @@ function getSampleDic() {
     }
   });
 }
+
 
 window.addEventListener('load', jakInit);
 window.addEventListener('unload', jakQuit);

@@ -57,11 +57,12 @@ body {
 }
 #suggests li {
   display: inline;
+  list-style-type: none;
   margin-right: 0.6em;
   padding: 0.2em;
   font-size: 2em;
   border-radius: 0.2em;
-  /* white-space: nowrap; */
+  white-space: nowrap;
 }
 .wordSelected {
   background-color: #48a;

@@ -1,7 +1,7 @@
 {
   "name": "JaK",
   "description": "Japanese Kana keyboard.",
-  "version": "0.6",
+  "version": "0.6.5",
   "type": "privileged",
   "role": "input",
   "launch_path": "/settings.html",
