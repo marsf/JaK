@@ -1,4 +1,4 @@
-// Copyright (c) 2015, Masahiko Imanaka. All rights reserved.
+// Copyright (c) 2015-2016, Masahiko Imanaka. All rights reserved.
 /* global KeyEvent, Swiper */
 /* jshint moz:true, esnext:true */
 
@@ -502,6 +502,10 @@ function transVoicedKana(aChar) {
       } else {
         if (chCode === 0x3045) {
           chCode = 0x3094;  // ぅ -> ゔ
+        } else if (chCode === 0x3043) {
+          chCode = 0x3090;  // ぃ -> ゐ
+        } else if (chCode === 0x3047) {
+          chCode = 0x3091;  // ぇ -> ゑ
         } else {
           chCode++;  // ぁ～ぉ -> あ～お
         }
@@ -514,7 +518,7 @@ function transVoicedKana(aChar) {
       }
     } else if (chCode === 0x3063) {
       chCode += 2;  // っ -> づ
-    } else if (chCode === 0x3064){
+    } else if (chCode === 0x3064) {
       chCode--;  // つ -> っ
     } else if (chCode <= 0x3069) {
       if ((chCode % 2) === 0) {
@@ -535,10 +539,15 @@ function transVoicedKana(aChar) {
       } else {
         chCode--;  // やゆよ -> ゃゅょ
       }
-    } else if (chCode === 0x308E) {
-      chCode++;  // ゎ -> わ
-    } else if (chCode === 0x308F) {
-      chCode--;  // わ -> ゎ
+    } else {
+      switch (chCode) {
+        case 0x308E: chCode++; break;  // ゎ -> わ
+        case 0x308F: chCode--; break;  // わ -> ゎ
+        case 0x3090: chCode = 0x3044; break;  // ゐ -> い
+        case 0x3091: chCode = 0x3048; break;  // ゑ -> え
+        case 0x3094: chCode = 0x3046; break;  // ゔ -> う
+        default:
+      }
     }
   } else if (0xff21 <= chCode && chCode <= 0xff5a) {  // Ａ～ｚ
     if (0xff21 <= chCode && chCode <= 0xff3a) {
@@ -554,18 +563,17 @@ function transVoicedKana(aChar) {
     }
   } else {
     switch (chCode) {
-      case 0x3094: chCode = 0x3046; break;  // ゔ -> う
+      case 0x3000: chCode = 0x0020; break;  // '　' -> ' '
+      case 0x3001: chCode = 0xff0c; break;  // 、 -> ，
+      case 0x3002: chCode = 0xff0e; break;  // 。 -> ．
       case 0x309b: chCode = 0x3001; break;  // ゛ -> 、
       case 0x309c: chCode = 0x3002; break;  // ゜ -> 。
       case 0x309d: chCode++; break;         // ゝ -> ゞ
       case 0x309e: chCode--; break;         // ゞ -> ゝ
-      case 0x3000: chCode = 0x0020; break;  // '　' -> ' '
-      case 0x3001: chCode = 0xff0c; break;  // 、 -> ，
-      case 0x3002: chCode = 0xff0e; break;  // 。 -> ．
+      case 0x30fc: chCode = 0xff5e; break;  // ー -> ～
       case 0xff0c: chCode = 0x3001; break;  // ， -> 、
       case 0xff0e: chCode = 0x3002; break;  // ． -> 。
       case 0xff0d: chCode = 0x30fc; break;  // － -> ー
-      case 0x30fc: chCode = 0xff5e; break;  // ー -> ～
       case 0xff5e: chCode = 0xff0d; break;  // ～ -> －
       default:
     }
