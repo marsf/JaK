@@ -495,7 +495,7 @@ function finalizeKeyHandle() {
 function transVoicedKana(aChar) {
   var chCode = aChar.charCodeAt(0);
 
-  if (0x3041 <= chCode && chCode <= 0x3093) {  // あ～ん
+  if (0x3041 <= chCode && chCode <= 0x3094) {  // あ～ん, ゔ
     if (chCode <= 0x304a) {
       if ((chCode % 2) === 0) {
         chCode--;  // あ～お -> ぁ～ぉ
