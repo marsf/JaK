@@ -671,8 +671,10 @@ function updateSuggests(aKana) {
     curr_item.className = 'wordSelected';
     // Scroll suggests box view to the selected word.
     // .offsetLeft and scrollIntoView() makes reflow.
-    if ((curr_item && curr_item.offsetLeft < 20) || tm.selectPos === 0) {
+    if ((curr_item && curr_item.offsetLeft < 10) || tm.selectPos === 0) {
       curr_item.scrollIntoView(true);
+    } else if (tm.selectPos > 1) {
+      toggleSuggestBox('expand');
     }
   } else {
     // Redraw suggest list.
@@ -704,20 +706,22 @@ function clearSuggests() {
 }
 
 function toggleSuggestBox(mode) {
+  var boxCollapsed = wordSuggestsElement.getAttribute('collapsed'),
+      set_collapsed = '',
+      expandBtn = document.getElementById('suggExpandButton');
   switch (mode) {
     case 'expand':
-      wordSuggestsElement.setAttribute('collapsed', 'false');
+      set_collapsed = 'false';
       break;
     case 'collapse':
-      wordSuggestsElement.setAttribute('collapsed', 'true');
+      set_collapsed = 'true';
       break;
     default:
-      var boxCollapsed = wordSuggestsElement.getAttribute('collapsed');
-      if (boxCollapsed === 'true') {
-        wordSuggestsElement.setAttribute('collapsed', 'false');
-      } else {
-        wordSuggestsElement.setAttribute('collapsed', 'true');
-      }
+      set_collapsed = (boxCollapsed === 'true') ? 'false' : 'true';
+  }
+  if (boxCollapsed !== set_collapsed) {
+    wordSuggestsElement.setAttribute('collapsed', set_collapsed);
+    expandBtn.textContent = (set_collapsed === 'true') ? '…' : '▼';
   }
   return;
 }

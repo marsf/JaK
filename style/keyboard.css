@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, Masahiko Imanaka. All rights reserved. */
+/* Copyright (c) 2015-2016, Masahiko Imanaka. All rights reserved. */
 @charset "UTF-8";
 
 html {
@@ -15,7 +15,7 @@ body {
   -moz-user-select: none;
   position: absolute;
   bottom: 0;
-  z-index: 15;
+  z-index: 10;
   width: 100%;
   max-width: 600px;
   background-color: rgba(0, 0, 0, 0.5);
@@ -24,41 +24,39 @@ body {
 
 
 #wordSuggests {
-  /*display: none;*/
   pointer-events: auto;
   position: absolute;
-  top: -3.2rem;
+  top: 0;
   right: 0;
   width: 100%;
   margin: 0;
   border-top: 0.1rem solid gray;
-  background-color: rgba(0, 0, 16, 0.8);
+  background-color: rgba(0, 0, 16, 0.75);
   color: #fff;
   font-family: monospace;
   z-index: 2;
 }
 
 #wordSuggests[collapsed="true"] {
-  height: 3.1rem;
+  height: 3.0rem;
   overflow: hidden;
 }
 #wordSuggests[collapsed="false"] {
-  height: 90%;
+  top: -10em;
+  height: 13em;
+  background-color: rgba(0, 0, 16, 0.9);
   overflow: scroll;
 }
 
 
 #suggests {
-  margin: 0 2.8em 1em 0.2em;
+  margin: 0 1.2em 1em 0.2em;
   padding: 0;
-}
-#suggests::first-line {
-  /*text-decoration:underline;*/
 }
 #suggests li {
   display: inline;
   list-style-type: none;
-  margin-right: 0.6em;
+  margin-right: 0.5em;
   padding: 0.2em;
   font-size: 2em;
   border-radius: 0.2em;
@@ -69,8 +67,8 @@ body {
 }
 
 #suggExpandButton {
-  position: absolute;
-  top: -3rem;
+  position: relative;
+  top: 0;
   right: 0;
   margin: 0;
   padding: 0 0.65em;
@@ -82,6 +80,18 @@ body {
   font-family: monospace;
   float: right;
   z-index: 3;
+}
+
+
+#statusSpace {
+  width: 100%;
+  height: 3.1rem;
+  margin: 0;
+  padding: 0;
+  background-color: transparent;
+  font-size: 2em;
+  color: #ffa;
+  text-align: center;
 }
 
 #keyContainer {
