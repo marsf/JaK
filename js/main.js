@@ -707,8 +707,7 @@ function clearSuggests() {
 
 function toggleSuggestBox(mode) {
   var boxCollapsed = wordSuggestsElement.getAttribute('collapsed'),
-      set_collapsed = '',
-      expandBtn = document.getElementById('suggExpandButton');
+      set_collapsed = '';
   switch (mode) {
     case 'expand':
       set_collapsed = 'false';
@@ -721,7 +720,18 @@ function toggleSuggestBox(mode) {
   }
   if (boxCollapsed !== set_collapsed) {
     wordSuggestsElement.setAttribute('collapsed', set_collapsed);
-    expandBtn.textContent = (set_collapsed === 'true') ? '…' : '▼';
+    if (set_collapsed === 'true') {
+      suggExpandButton.textContent = '…';
+      suggExpandButton.style.top = '0';
+      // Scroll to selected word.
+      var selectedItem = document.querySelector('.wordSelected');
+      if (selectedItem) {
+        wordSuggestsElement.scrollTop = selectedItem.offsetTop;
+      }
+    } else {
+      suggExpandButton.textContent = '▼';
+      suggExpandButton.style.top = '-100px';
+    }
   }
   return;
 }
