@@ -244,8 +244,16 @@ function keyHandle(aKeyValue, aFlickDirection) {
           cp.isTransferred = true;
           transPromise = getTransWords(tm.targetKana);
         } else {
-          var t_str = tm.getNextWord(),
+          var t_str = '',
               nextStr = tm.lastKana.slice(cp.relCursorPos);
+          if (aFlickDirection === 'up') {
+            // カタカナ候補
+            t_str = transChar(tm.targetKana, 'KANA');
+          } else if (aFlickDirection === 'left') {
+            t_str = tm.getPrevWord();
+          } else {
+            t_str = tm.getNextWord();
+          }
           cp.setCurrentStr(t_str + nextStr);
           tm.setClauses(cp.textStr.length, t_str.length);
         }
@@ -639,10 +647,11 @@ function getTransWords(aStr) {
         firstCode = aStr.charCodeAt(0),
         results = [];
     if (0x3040 <= firstCode && firstCode <= 0x30ff) {
-      // ひらがなカタカナ変換
-      results.push(transChar(aStr, 'KANA'));
       if (aStr in dicData) {
         results = results.concat(dicData[aStr]);
+      } else {
+        // カタカナ変換
+        results.push(transChar(aStr, 'KANA'));
       }
     } else {
       // 英数記号 半角全角変換
@@ -962,6 +971,20 @@ var TransferManager = {
       this._selectPos++;
       if (this._selectPos >= this._suggestWords.length) {
         this._selectPos = 0;
+      }
+      return this._suggestWords[this._selectPos];
+    } else {
+      this._selectPos = 0;
+      return '';
+    }
+  },
+
+  getPrevWord: function TM_getPrevWord() {
+    if (this._suggestWords.length > 0) {
+      if (this._selectPos === 0) {
+        this._selectPos = this._suggestWords.length - 1;
+      } else {
+        this._selectPos--;
       }
       return this._suggestWords[this._selectPos];
     } else {
