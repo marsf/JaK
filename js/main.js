@@ -28,6 +28,7 @@ function jakInit() {
   swipeContainer.start();
   swipeContainer.ontouch = startKeyHandle;
   swipeContainer.onswiped = endKeyHandle;
+  swipeContainer.threshold = 10;
 
   wordSuggestsElement.addEventListener('click', clickSuggestsBox, false);
   suggExpandButton.addEventListener('click', suggExpand, false);
